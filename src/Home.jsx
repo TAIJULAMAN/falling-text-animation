@@ -3,7 +3,7 @@ import { FallingText } from './falling-interactive-text'
 
 function OnHover() {
   return (
-  <div className="h-screen w-screen flex items-center justify-center">
+    <div className="h-screen w-screen flex items-center justify-center">
       <div className="w-full max-w-4xl h-96">
         <FallingText
           text={`React Bits is a library of animated and interactive React components designed to streamline UI development and simplify your workflow.`}
@@ -21,10 +21,9 @@ function OnHover() {
   );
 }
 
-
 function OnClick() {
   return (
-  <div className="h-screen w-screen flex items-center justify-center">
+    <div className="h-screen w-screen flex items-center justify-center">
       <div className="w-full max-w-4xl h-96">
         <FallingText
           text={`React Bits is a library of animated and interactive React components designed to streamline UI development and simplify your workflow.`}
