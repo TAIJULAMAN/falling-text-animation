@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import * as Matter from 'matter-js';
 
 const FallingText = ({
-  text = '',
+  text = 'aman',
   highlightWords = [],
   trigger = 'hover',
   backgroundColor = 'transparent',
@@ -15,6 +15,7 @@ const FallingText = ({
   const textRef = useRef(null);
   const canvasContainerRef = useRef(null);
   const [effectStarted, setEffectStarted] = useState(false);
+  const [initialPositions, setInitialPositions] = useState([]);
 
   useEffect(() => {
     if (!textRef.current) return;
@@ -23,9 +24,7 @@ const FallingText = ({
     const newHTML = words
       .map(word => {
         const isHighlighted = highlightWords.some(hw => word.startsWith(hw));
-        return `<span class="inline-block mx-1 ${
-          isHighlighted ? 'text-red-500 font-bold' : ''
-        }">${word}</span>`;
+        return `<span class="inline-block mx-1 ${isHighlighted ? 'text-red-500 font-bold' : ''}">${word}</span>`;
       })
       .join(' ');
 
@@ -89,10 +88,10 @@ const FallingText = ({
       const x = rect.left - containerRect.left + rect.width / 2;
       const y = rect.top - containerRect.top + rect.height / 2;
 
-      const initialVelocity = {
-        x: (Math.random() - 0.5) * 3,
-        y: (Math.random() - 0.5) * 1
-      };
+      // Store initial positions
+      if (!initialPositions.length) {
+        setInitialPositions(prev => [...prev, { x, y }]);
+      }
 
       const body = Bodies.rectangle(x, y, rect.width, rect.height, {
         render: { fillStyle: 'transparent' },
@@ -104,8 +103,6 @@ const FallingText = ({
         angularVelocity: (Math.random() - 0.5) * 0.2
       });
 
-      Matter.Body.setVelocity(body, initialVelocity);
-
       if (highlightWords.some(hw => elem.textContent.startsWith(hw))) {
         const hue = Math.random() * 360;
         elem.style.color = `hsl(${hue}, 100%, 50%)`;
@@ -114,7 +111,7 @@ const FallingText = ({
       return { elem, body };
     });
 
-    wordBodies.forEach(({ elem, body }) => {
+    wordBodies.forEach(({ elem, body }, index) => {
       elem.style.position = 'absolute';
       elem.style.left = `${body.position.x - body.bounds.max.x + body.bounds.min.x / 2}px`;
       elem.style.top = `${body.position.y - body.bounds.max.y + body.bounds.min.y / 2}px`;
@@ -133,17 +130,34 @@ const FallingText = ({
     });
     render.mouse = mouse;
 
-    World.add(engine.world, [
-      floor,
-      mouseConstraint,
-      ...wordBodies.map(wb => wb.body),
-    ]);
+    // Only add bodies to the world when effect is started
+    if (effectStarted) {
+      World.add(engine.world, [
+        floor,
+        mouseConstraint,
+        ...wordBodies.map(wb => wb.body),
+      ]);
+    }
 
     const runner = Runner.create();
     Runner.run(runner, engine);
     Render.run(render);
 
     const updateLoop = () => {
+      if (!effectStarted) {
+        // Reset positions to initial if effect not started
+        wordBodies.forEach(({ elem }, index) => {
+          const pos = initialPositions[index];
+          if (pos) {
+            elem.style.left = `${pos.x}px`;
+            elem.style.top = `${pos.y}px`;
+            elem.style.transform = 'none';
+          }
+        });
+        requestAnimationFrame(updateLoop);
+        return;
+      }
+
       wordBodies.forEach(({ body, elem }) => {
         const { x, y } = body.position;
         const wiggle = Math.sin(Date.now() / 500 + body.position.x / 100) * 2;

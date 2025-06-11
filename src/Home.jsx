@@ -3,12 +3,11 @@ import { FallingText } from './falling-interactive-text'
 
 function OnHover() {
   return (
-    <div className="h-screen w-screen flex items-center justify-center">
-      <div className="w-full max-w-4xl h-96">
+    <div className="">
+      <div className="w-full h-[calc(100dvh-4rem)]">
         <FallingText
-          text={`React Bits is a library of animated and interactive React components designed to streamline UI development and simplify your workflow.`}
-          highlightWords={["React", "Bits", "animated", "components", "simplify"]}
-          highlightClass="highlighted"
+          text={`a animated and interactive React components designed by Aman to streamline UI development and simplify your workflow.`}
+          highlightWords={['animated', 'Aman']}
           trigger="hover"
           backgroundColor="transparent"
           wireframes={false}
@@ -23,12 +22,11 @@ function OnHover() {
 
 function OnClick() {
   return (
-    <div className="h-screen w-screen flex items-center justify-center">
-      <div className="w-full max-w-4xl h-96">
+    <div className="">
+      <div className="w-full h-[calc(100dvh-4rem)]">
         <FallingText
           text={`React Bits is a library of animated and interactive React components designed to streamline UI development and simplify your workflow.`}
-          highlightWords={["React", "Bits", "animated", "components", "simplify"]}
-          highlightClass="highlighted"
+          highlightWords={['React', 'Bits', 'animated', 'components', 'simplify']}
           trigger="click"
           backgroundColor="transparent"
           wireframes={false}
