@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import * as Matter from 'matter-js';
 
 const FallingText = ({
-  text = 'aman',
+  text = '',
   highlightWords = [],
   trigger = 'hover',
   backgroundColor = 'transparent',
@@ -24,7 +24,9 @@ const FallingText = ({
     const newHTML = words
       .map(word => {
         const isHighlighted = highlightWords.some(hw => word.startsWith(hw));
-        return `<span class="inline-block mx-1 ${isHighlighted ? 'text-red-500 font-bold' : ''}">${word}</span>`;
+        return `<span class="inline-block mx-1 ${
+          isHighlighted ? 'text-red-500 font-bold' : ''
+        }">${word}</span>`;
       })
       .join(' ');
 
@@ -69,16 +71,42 @@ const FallingText = ({
       render: { fillStyle: 'transparent' },
     };
 
-    const floor = Bodies.rectangle(
-      width / 2,
-      height + 25,
-      width,
-      50,
-      {
-        ...boundaryOptions,
-        restitution: 0.2
-      }
-    );
+    // Create walls
+    const walls = [
+      // Left wall
+      Bodies.rectangle(
+        0,
+        height / 2,
+        20,
+        height,
+        {
+          ...boundaryOptions,
+          restitution: 0.8,
+        }
+      ),
+      // Right wall
+      Bodies.rectangle(
+        width,
+        height / 2,
+        20,
+        height,
+        {
+          ...boundaryOptions,
+          restitution: 0.8,
+        }
+      ),
+      // Floor
+      Bodies.rectangle(
+        width / 2,
+        height + 25,
+        width,
+        50,
+        {
+          ...boundaryOptions,
+          restitution: 0.2
+        }
+      )
+    ];
 
     if (!textRef.current) return;
     const wordSpans = textRef.current.querySelectorAll('span');
@@ -133,7 +161,7 @@ const FallingText = ({
     // Only add bodies to the world when effect is started
     if (effectStarted) {
       World.add(engine.world, [
-        floor,
+        ...walls,
         mouseConstraint,
         ...wordBodies.map(wb => wb.body),
       ]);
