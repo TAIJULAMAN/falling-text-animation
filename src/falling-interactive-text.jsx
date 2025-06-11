@@ -70,28 +70,50 @@ const FallingText = ({
       render: { fillStyle: 'transparent' },
     };
 
+    // Create floor with slight bounce
     const floor = Bodies.rectangle(
       width / 2,
       height + 25,
       width,
       50,
-      boundaryOptions
+      {
+        ...boundaryOptions,
+        restitution: 0.2 // Slight bounce
+      }
     );
 
     if (!textRef.current) return;
     const wordSpans = textRef.current.querySelectorAll('span');
-    const wordBodies = Array.from(wordSpans).map(elem => {
+    const wordBodies = Array.from(wordSpans).map((elem, index) => {
       const rect = elem.getBoundingClientRect();
 
       const x = rect.left - containerRect.left + rect.width / 2;
       const y = rect.top - containerRect.top + rect.height / 2;
 
+      // Add random initial velocity and rotation
+      const initialVelocity = {
+        x: (Math.random() - 0.5) * 3,
+        y: (Math.random() - 0.5) * 1
+      };
+
       const body = Bodies.rectangle(x, y, rect.width, rect.height, {
         render: { fillStyle: 'transparent' },
-        restitution: 0.8,
+        restitution: 0.8 + Math.random() * 0.2, // Random bounce
         frictionAir: 0.01,
         friction: 0.2,
+        density: 0.004 + Math.random() * 0.002, // Random density
+        angle: Math.random() * Math.PI * 2, // Random initial rotation
+        angularVelocity: (Math.random() - 0.5) * 0.2 // Random angular velocity
       });
+
+      // Add initial velocity
+      Matter.Body.setVelocity(body, initialVelocity);
+
+      // Add random color variation for highlighted words
+      if (highlightWords.some(hw => elem.textContent.startsWith(hw))) {
+        const hue = Math.random() * 360;
+        elem.style.color = `hsl(${hue}, 100%, 50%)`;
+      }
 
       return { elem, body };
     });
@@ -109,6 +131,8 @@ const FallingText = ({
       constraint: {
         stiffness: mouseConstraintStiffness,
         render: { visible: false },
+        length: 0.1, // Make mouse interaction more responsive
+        damping: 0.2 // Add some damping to mouse interaction
       },
     });
     render.mouse = mouse;
@@ -126,10 +150,31 @@ const FallingText = ({
     const updateLoop = () => {
       wordBodies.forEach(({ body, elem }) => {
         const { x, y } = body.position;
-        elem.style.left = `${x}px`;
+        
+        // Add some random wiggle effect
+        const wiggle = Math.sin(Date.now() / 500 + body.position.x / 100) * 2;
+        
+        elem.style.left = `${x + wiggle}px`;
         elem.style.top = `${y}px`;
-        elem.style.transform = `translate(-50%, -50%) rotate(${body.angle}rad)`;
+        
+        // Add smooth rotation with some variation
+        const rotation = body.angle + (Math.sin(Date.now() / 1000 + body.position.x / 50) * 0.1);
+        elem.style.transform = `translate(-50%, -50%) rotate(${rotation}rad)`;
       });
+      
+      // Add some random force to make the words more dynamic
+      wordBodies.forEach(({ body }, index) => {
+        if (Math.random() < 0.05) { // 5% chance per frame
+          Matter.Body.applyForce(body, {
+            x: body.position.x,
+            y: body.position.y
+          }, {
+            x: (Math.random() - 0.5) * 0.005,
+            y: (Math.random() - 0.5) * 0.005
+          });
+        }
+      });
+      
       requestAnimationFrame(updateLoop);
     };
     updateLoop();
@@ -169,6 +214,8 @@ const FallingText = ({
         style={{
           fontSize,
           lineHeight: 1.4,
+          transition: 'all 0.3s ease',
+          opacity: effectStarted ? 1 : 0
         }}
       />
       <div className="absolute top-0 left-0" ref={canvasContainerRef} />
