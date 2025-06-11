@@ -1,139 +1,177 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import * as Matter from 'matter-js';
 
 const FallingText = ({
-  text,
+  text = '',
   highlightWords = [],
-  highlightClass = 'highlighted',
   trigger = 'hover',
   backgroundColor = 'transparent',
   wireframes = false,
   gravity = 0.56,
-  fontSize = '2rem',
-  mouseConstraintStiffness = 0.9
+  mouseConstraintStiffness = 0.9,
+  fontSize = '2rem'
 }) => {
   const containerRef = useRef(null);
-  const engine = useRef(null);
-  const world = useRef(null);
-  const bodies = useRef([]);
-  const canvasRef = useRef(null);
+  const textRef = useRef(null);
+  const canvasContainerRef = useRef(null);
+  const [effectStarted, setEffectStarted] = useState(false);
 
   useEffect(() => {
-    // Initialize Matter.js
-    engine.current = Matter.Engine.create();
-    world.current = engine.current.world;
-    
-    // Set gravity
-    engine.current.gravity.y = gravity;
-
-    // Create canvas
-    const container = containerRef.current;
-    const width = container.offsetWidth;
-    const height = container.offsetHeight;
-    
-    const canvas = document.createElement('canvas');
-    canvas.style.position = 'absolute';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    canvas.width = width;
-    canvas.height = height;
-    container.appendChild(canvas);
-    canvasRef.current = canvas;
-
-    // Create floor
-    Matter.World.add(world.current, [
-      Matter.Bodies.rectangle(width / 2, height - 10, width, 20, { isStatic: true })
-    ]);
-
-    // Create text bodies
+    if (!textRef.current) return;
     const words = text.split(' ');
-    const ctx = canvas.getContext('2d');
-    ctx.font = `bold ${fontSize}`;
 
-    words.forEach((word, index) => {
-      const wordWidth = ctx.measureText(word).width;
-      const x = Math.random() * (width - wordWidth);
-      const y = -index * 50;
-      
-      const body = Matter.Bodies.rectangle(x, y, wordWidth, 20, {
-        label: word,
-        render: {
-          fillStyle: highlightWords.includes(word) ? 'red' : 'black',
-          strokeStyle: 'transparent',
-          lineWidth: 0,
-          wireframes: false
-        }
-      });
-      
-      bodies.current.push(body);
-      Matter.World.add(world.current, body);
+    const newHTML = words
+      .map(word => {
+        const isHighlighted = highlightWords.some(hw => word.startsWith(hw));
+        return `<span class="inline-block mx-[2px] select-none ${
+          isHighlighted ? 'text-red-500 font-bold' : ''
+        }">${word}</span>`;
+      })
+      .join(' ');
+
+    textRef.current.innerHTML = newHTML;
+  }, [text, highlightWords]);
+
+  useEffect(() => {
+    if (trigger === 'hover') {
+      setEffectStarted(true);
+    }
+  }, [trigger]);
+
+  useEffect(() => {
+    if (!effectStarted) return;
+
+    const { Engine, Render, World, Bodies, Runner, Mouse, MouseConstraint } = Matter;
+
+    if (!containerRef.current || !canvasContainerRef.current) return;
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const width = containerRect.width;
+    const height = containerRect.height;
+
+    if (width <= 0 || height <= 0) return;
+
+    const engine = Engine.create();
+    engine.world.gravity.y = gravity;
+
+    const render = Render.create({
+      element: canvasContainerRef.current,
+      engine,
+      options: {
+        width,
+        height,
+        background: backgroundColor,
+        wireframes,
+      },
     });
 
-    // Add mouse constraint
-    const mouse = Matter.Mouse.create(canvas);
-    const mouseConstraint = Matter.MouseConstraint.create(engine.current, {
-      mouse: mouse,
+    const boundaryOptions = {
+      isStatic: true,
+      render: { fillStyle: 'transparent' },
+    };
+
+    const floor = Bodies.rectangle(
+      width / 2,
+      height + 25,
+      width,
+      50,
+      boundaryOptions
+    );
+
+    if (!textRef.current) return;
+    const wordSpans = textRef.current.querySelectorAll('span');
+    const wordBodies = Array.from(wordSpans).map(elem => {
+      const rect = elem.getBoundingClientRect();
+
+      const x = rect.left - containerRect.left + rect.width / 2;
+      const y = rect.top - containerRect.top + rect.height / 2;
+
+      const body = Bodies.rectangle(x, y, rect.width, rect.height, {
+        render: { fillStyle: 'transparent' },
+        restitution: 0.8,
+        frictionAir: 0.01,
+        friction: 0.2,
+      });
+
+      return { elem, body };
+    });
+
+    wordBodies.forEach(({ elem, body }) => {
+      elem.style.position = 'absolute';
+      elem.style.left = `${body.position.x - body.bounds.max.x + body.bounds.min.x / 2}px`;
+      elem.style.top = `${body.position.y - body.bounds.max.y + body.bounds.min.y / 2}px`;
+      elem.style.transform = 'none';
+    });
+
+    const mouse = Mouse.create(containerRef.current);
+    const mouseConstraint = MouseConstraint.create(engine, {
+      mouse,
       constraint: {
         stiffness: mouseConstraintStiffness,
-        render: {
-          visible: false
-        }
-      }
+        render: { visible: false },
+      },
     });
+    render.mouse = mouse;
 
-    Matter.World.add(world.current, mouseConstraint);
+    World.add(engine.world, [
+      floor,
+      mouseConstraint,
+      ...wordBodies.map(wb => wb.body),
+    ]);
 
-    // Animation loop
-    const animationLoop = () => {
-      Matter.Engine.update(engine.current, 1000 / 60);
-      
-      // Clear canvas
-      ctx.clearRect(0, 0, width, height);
-      
-      // Draw text
-      bodies.current.forEach(body => {
-        const word = body.label;
-        const color = highlightWords.includes(word) ? 'red' : 'black';
-        ctx.fillStyle = color;
-        ctx.fillText(word, body.position.x - ctx.measureText(word).width / 2, body.position.y);
+    const runner = Runner.create();
+    Runner.run(runner, engine);
+    Render.run(render);
+
+    const updateLoop = () => {
+      wordBodies.forEach(({ body, elem }) => {
+        const { x, y } = body.position;
+        elem.style.left = `${x}px`;
+        elem.style.top = `${y}px`;
+        elem.style.transform = `translate(-50%, -50%) rotate(${body.angle}rad)`;
       });
-      
-      requestAnimationFrame(animationLoop);
+      requestAnimationFrame(updateLoop);
     };
+    updateLoop();
 
-    animationLoop();
-
-    // Cleanup
     return () => {
-      Matter.World.clear(world.current);
-      Matter.Engine.clear(engine.current);
-      container.removeChild(canvas);
+      Render.stop(render);
+      Runner.stop(runner);
+      if (render.canvas && canvasContainerRef.current) {
+        canvasContainerRef.current.removeChild(render.canvas);
+      }
+      World.clear(engine.world, false);
+      Engine.clear(engine);
     };
-  }, [text, highlightWords, gravity, wireframes, mouseConstraintStiffness, fontSize]);
+  }, [
+    effectStarted,
+    gravity,
+    wireframes,
+    backgroundColor,
+    mouseConstraintStiffness,
+  ]);
+
+  const handleTrigger = () => {
+    if (!effectStarted && (trigger === 'click' || trigger === 'hover')) {
+      setEffectStarted(true);
+    }
+  };
 
   return (
     <div
       ref={containerRef}
-      style={{
-        backgroundColor,
-        width: '100%',
-        height: '100%',
-        position: 'relative',
-        overflow: 'hidden'
-      }}
+      className="relative w-full h-full cursor-pointer overflow-hidden"
+      onClick={trigger === 'click' ? handleTrigger : undefined}
+      onMouseOver={trigger === 'hover' ? handleTrigger : undefined}
     >
-      <div className="text-container">
-        {text.split(' ').map((word, index) => (
-          <span
-            key={index}
-            className={highlightWords.includes(word) ? highlightClass : ''}
-          >
-            {word}{' '}
-          </span>
-        ))}
-      </div>
+      <div
+        ref={textRef}
+        style={{
+          fontSize,
+          lineHeight: 1.4,
+        }}
+      />
+      <div className="absolute top-0 left-0" ref={canvasContainerRef} />
     </div>
   );
 };
